@@ -1,13 +1,15 @@
 import os
 import sys
-
-import mlflow
-from flask import Flask, jsonify, request
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 from datetime import datetime
 
+import mlflow
+from database import log_prediction
+from flask import Flask, jsonify, request
+from mlflow.tracking import MlflowClient
+
 from config import config
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
 
 def create_app():
@@ -23,11 +25,17 @@ def create_app():
         model_uri = f"models:/{config.MODEL_NAME}@{config.MODEL_ALIAS}"
         app.model = mlflow.sklearn.load_model(model_uri)
         app.model_loaded = True
+
+        client = MlflowClient()
+        mv = client.get_model_version_by_alias(config.MODEL_NAME, config.MODEL_ALIAS)
+        app.model_version = mv.version
+
         print(f"✅ Model loaded: {model_uri}")
     except Exception as e:
         print(f"❌ Failed to load model: {e}")
         app.model = None
         app.model_loaded = False
+        app.model_version = "unknown"
 
     @app.route("/")
     def health_check():
@@ -57,6 +65,13 @@ def create_app():
             # Make prediction
             prediction = app.model.predict([data])[0]
             probability = app.model.predict_proba([data])[0][1]
+
+            model_version = getattr(app, "model_version", "unknown")
+
+            log_success = log_prediction(data, float(probability), model_version)
+
+            if not log_success:
+                print("Warning: failed to log prediction to database")
 
             return jsonify(
                 {

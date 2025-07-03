@@ -44,6 +44,7 @@ lint.ignore = [
    "E501",   # Line too long (handled by formatter)
    "B008",   # Do not perform function calls in argument defaults
    "N806",   # Allow ML variable naming conventions (X_train, X_test, etc.)
+   "N803",   # Allow ML arg naming conventions
 ]
 
 # Exclude directories

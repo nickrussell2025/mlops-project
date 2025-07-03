@@ -1,5 +1,6 @@
 import sys
-sys.path.append('src')
+
+sys.path.append("src")
 from mlops_churn.database import log_prediction, log_drift_result
 
 # Test prediction logging

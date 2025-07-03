@@ -3,11 +3,11 @@ import os
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-from config import config
 
 # from xgboost import XGBClassifier
 # from lightgbm import LGBMClassifier
 from prefect import flow, task
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -16,6 +16,23 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+
+from config import config
+
+
+class ChurnFeatureEngineer(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.balance_threshold = None
+
+    def fit(self, X, y=None):
+        self.balance_threshold = X["Balance"].quantile(0.75)
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        X["high_value_customer"] = (X["Balance"] > self.balance_threshold).astype(int)
+        X["zero_balance"] = (X["Balance"] == 0).astype(int)
+        return X
 
 
 class ChurnDataProcessor:
@@ -78,15 +95,6 @@ class ChurnDataProcessor:
     def engineer_features(self):
         """Create features from dataset"""
 
-        # calculate balance threshold for new feature
-        balance_threshold = self.df_clean["Balance"].quantile(0.75)
-
-        # create features
-        self.df_clean["high_value_customer"] = (
-            self.df_clean["Balance"] > balance_threshold
-        )
-        self.df_clean["zero_balance"] = (self.df_clean["Balance"] == 0).astype(int)
-
         # define feature sets
         self.categorical_features = ["Geography", "Gender"]
         self.numerical_features = [
@@ -95,11 +103,7 @@ class ChurnDataProcessor:
             "NumOfProducts",
             "HasCrCard",
             "IsActiveMember",
-            "zero_balance",
-            "high_value_customer",
         ]
-
-        self.balance_threshold = balance_threshold
 
         print(
             f"Feature engineering completed: {len(self.categorical_features)} categorical features, {len(self.numerical_features)} numerical features"
