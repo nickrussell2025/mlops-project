@@ -7,7 +7,6 @@ os.environ["TZ"] = "Europe/London"
 time.tzset()
 
 import mlflow
-import pandas as pd
 from database import log_prediction
 from flask import Flask, jsonify, request
 from mlflow.tracking import MlflowClient
@@ -47,6 +46,7 @@ def create_app():
     @app.route("/")
     def health_check():
         """Health check endpoint"""
+
         return jsonify(
             {
                 "status": "healthy",
@@ -60,22 +60,20 @@ def create_app():
     @app.route("/predict", methods=["POST"])
     def predict():
         """Single prediction endpoint"""
+
         if not app.model_loaded:
             return jsonify({"error": "Model not loaded"}), 500
 
         try:
-            # Get input data
             data = request.get_json()
             if not data:
                 return jsonify({"error": "No JSON data provided"}), 400
 
-            # Make prediction
-            input_df = pd.DataFrame([data])
-            prediction = app.model.predict(input_df)[0]
-            probability = app.model.predict_proba(input_df)[0][1]
+            customer_dict = [data]
+            prediction = app.model.predict(customer_dict)[0]
+            probability = app.model.predict_proba(customer_dict)[0][1]
 
             model_version = getattr(app, "model_version", "unknown")
-
             log_success = log_prediction(data, float(probability), model_version)
 
             if not log_success:
