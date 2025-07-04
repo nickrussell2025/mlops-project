@@ -26,7 +26,7 @@ install:
 	uv sync --all-extras
 
 test:
-	uv run pytest tests/ -v
+	uv run pytest tests/ -v -W ignore::DeprecationWarning
 
 test-api:
 	uv run pytest tests/test_api.py -v
