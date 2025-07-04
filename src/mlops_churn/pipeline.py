@@ -7,7 +7,6 @@ import pandas as pd
 # from xgboost import XGBClassifier
 # from lightgbm import LGBMClassifier
 from prefect import flow, task
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -20,25 +19,11 @@ from sklearn.pipeline import Pipeline
 from config import config
 
 
-class ChurnFeatureEngineer(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        self.balance_threshold = None
-
-    def fit(self, X, y=None):
-        self.balance_threshold = X["Balance"].quantile(0.75)
-        return self
-
-    def transform(self, X):
-        X = X.copy()
-        X["high_value_customer"] = (X["Balance"] > self.balance_threshold).astype(int)
-        X["zero_balance"] = (X["Balance"] == 0).astype(int)
-        return X
-
-
 class ChurnDataProcessor:
     def __init__(self, data_path=None):
         self.data_path = data_path or str(config.DATA_DIR / "raw")
         self.df_clean = None
+        self.balance_threshold = None
 
     def load_and_clean_data(self):
         """Load CSV, fix data types, remove unnecessary columns"""
@@ -93,23 +78,53 @@ class ChurnDataProcessor:
         return self
 
     def engineer_features(self):
-        """Create features from dataset"""
+        """Create features from dataset and add new engineered financial and risk features"""
+
+        # calculate threshold
+        self.balance_threshold = self.df_clean["Balance"].quantile(0.75)
+
+        # create new augmented features
+        self.df_clean["high_value_customer"] = (
+            self.df_clean["Balance"] > self.balance_threshold
+        ).astype(int)
+        self.df_clean["zero_balance"] = (self.df_clean["Balance"] == 0).astype(int)
 
         # define feature sets
         self.categorical_features = ["Geography", "Gender"]
         self.numerical_features = [
+            "CreditScore",
             "Age",
             "Tenure",
+            "Balance",
             "NumOfProducts",
             "HasCrCard",
             "IsActiveMember",
+            "EstimatedSalary",
+            "zero_balance",
+            "high_value_customer",
         ]
+
+        # save reference data for monitoring
+        self.save_reference_data()
 
         print(
             f"Feature engineering completed: {len(self.categorical_features)} categorical features, {len(self.numerical_features)} numerical features"
         )
 
         return self
+
+    def save_reference_data(self):
+        """Save reference dataset for monitoring"""
+
+        os.makedirs("monitoring", exist_ok=True)
+
+        # save reference data (training data without target)
+        reference_data = self.df_clean.drop("Exited", axis=1).copy()
+        reference_data.to_parquet("monitoring/reference_data.parquet")
+
+        print(f"Reference data saved: {len(reference_data)} records")
+
+        return reference_data
 
 
 class ChurnModelTrainer:
@@ -193,7 +208,7 @@ class ChurnModelTrainer:
 
         with mlflow.start_run():
             # train model
-            model = LogisticRegression(random_state=42, max_iter=1000)
+            model = LogisticRegression(random_state=42, max_iter=10000)
             model.fit(self.X_train_df, self.y_train)
 
             # evaluate on validation set
@@ -230,13 +245,13 @@ class ChurnModelRegistry:
     def register_model(self, trainer, processor):
         """Register complete pipeline in MLflow registry"""
 
-        # Create complete pipeline
+        # create complete pipeline
         pipeline = Pipeline(
             [("vectorizer", trainer.dv), ("classifier", trainer.best_model)]
         )
 
         with mlflow.start_run():
-            # Log parameters
+            # log parameters
             mlflow.log_params(
                 {
                     "model_type": "LogisticRegression",
@@ -245,7 +260,7 @@ class ChurnModelRegistry:
                 }
             )
 
-            # Log complete pipeline
+            # log complete pipeline
             from mlflow.models.signature import infer_signature
 
             signature = infer_signature(
@@ -256,7 +271,7 @@ class ChurnModelRegistry:
                 pipeline, name="model", signature=signature
             )
 
-            # Register and set alias
+            # register and set alias
             registered_model = mlflow.register_model(
                 logged_model.model_uri, config.MODEL_NAME
             )

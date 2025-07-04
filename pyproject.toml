@@ -45,6 +45,7 @@ lint.ignore = [
    "B008",   # Do not perform function calls in argument defaults
    "N806",   # Allow ML variable naming conventions (X_train, X_test, etc.)
    "N803",   # Allow ML arg naming conventions
+   "E402",   # Module level import allowed at top of file
 ]
 
 # Exclude directories

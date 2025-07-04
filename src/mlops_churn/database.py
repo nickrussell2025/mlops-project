@@ -42,10 +42,10 @@ def log_prediction(input_data, prediction, model_version):
         # insert the prediction into the predictions table
         cur.execute(
             """
-           INSERT INTO predictions (input_data, prediction, model_version)
-           VALUES (%s, %s, %s)
-       """,
-            (json.dumps(input_data), float(prediction), model_version),
+            INSERT INTO predictions (timestamp, input_data, prediction, model_version)
+            VALUES (NOW(), %s, %s, %s)
+        """,
+            (json.dumps(input_data), round(float(prediction), 4), model_version),
         )
 
         conn.commit()

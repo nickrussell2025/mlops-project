@@ -1,8 +1,13 @@
 import os
 import sys
+import time
 from datetime import datetime
 
+os.environ["TZ"] = "Europe/London"
+time.tzset()
+
 import mlflow
+import pandas as pd
 from database import log_prediction
 from flask import Flask, jsonify, request
 from mlflow.tracking import MlflowClient
@@ -10,6 +15,8 @@ from mlflow.tracking import MlflowClient
 from config import config
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+
+print(f"Python timezone: {time.tzname}, Current time: {datetime.now()}")
 
 
 def create_app():
@@ -46,7 +53,7 @@ def create_app():
                 "service": "bank-churn-prediction-api",
                 "model_name": config.MODEL_NAME,
                 "model_loaded": app.model_loaded,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now().astimezone().isoformat(),
             }
         )
 
@@ -63,8 +70,9 @@ def create_app():
                 return jsonify({"error": "No JSON data provided"}), 400
 
             # Make prediction
-            prediction = app.model.predict([data])[0]
-            probability = app.model.predict_proba([data])[0][1]
+            input_df = pd.DataFrame([data])
+            prediction = app.model.predict(input_df)[0]
+            probability = app.model.predict_proba(input_df)[0][1]
 
             model_version = getattr(app, "model_version", "unknown")
 
@@ -76,8 +84,8 @@ def create_app():
             return jsonify(
                 {
                     "prediction": int(prediction),
-                    "probability": float(probability),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "probability": round(float(probability), 4),
+                    "timestamp": datetime.now().astimezone().isoformat(),
                 }
             )
 
