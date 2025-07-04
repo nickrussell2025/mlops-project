@@ -58,3 +58,5 @@ logs/*.jsonl
 Thumbs.db
 
 tests/monitoring.py
+
+README.md
