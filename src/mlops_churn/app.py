@@ -7,11 +7,12 @@ os.environ["TZ"] = "Europe/London"
 time.tzset()
 
 import mlflow
-from database import log_prediction
+import pandas as pd
 from flask import Flask, jsonify, request
 from mlflow.tracking import MlflowClient
 
-from config import config
+from src.mlops_churn.config import config
+from src.mlops_churn.database import log_prediction
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
@@ -36,7 +37,7 @@ def create_app():
         mv = client.get_model_version_by_alias(config.MODEL_NAME, config.MODEL_ALIAS)
         app.model_version = mv.version
 
-        print(f"✅ Model loaded: {model_uri}")
+        print(f"✅ Model loaded: {model_uri} - version {app.model_version}")
     except Exception as e:
         print(f"❌ Failed to load model: {e}")
         app.model = None
@@ -69,9 +70,9 @@ def create_app():
             if not data:
                 return jsonify({"error": "No JSON data provided"}), 400
 
-            customer_dict = [data]
-            prediction = app.model.predict(customer_dict)[0]
-            probability = app.model.predict_proba(customer_dict)[0][1]
+            df_input = pd.DataFrame([data])
+            prediction = app.model.predict(df_input)[0]
+            probability = app.model.predict_proba(df_input)[0][1]
 
             model_version = getattr(app, "model_version", "unknown")
             log_success = log_prediction(data, float(probability), model_version)

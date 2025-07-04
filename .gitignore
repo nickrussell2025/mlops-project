@@ -38,6 +38,7 @@ models/*.joblib
 data/raw/*.csv
 data/processed/*.parquet
 data/reference/*.parquet
+monitoring/
 
 # Logs
 logs/*.log
