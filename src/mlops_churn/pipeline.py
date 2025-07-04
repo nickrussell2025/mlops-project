@@ -1,8 +1,12 @@
 import os
+import warnings
 
+import kaggle
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+from mlflow.models.signature import infer_signature
+from mlflow.tracking import MlflowClient
 
 # from xgboost import XGBClassifier
 # from lightgbm import LGBMClassifier
@@ -17,6 +21,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+warnings.filterwarnings("ignore", message=".*artifact_path.*deprecated.*")
+
 
 class ChurnDataProcessor:
     def __init__(self, data_path="data/raw"):
@@ -28,11 +34,11 @@ class ChurnDataProcessor:
 
         file_path = f"{self.data_path}/Churn_Modelling.csv"
 
-        if not os.path.exists(file_path):
-            print("Downloading data...")
+        if not os.path.exists(self.data_path):
             os.makedirs(self.data_path, exist_ok=True)
-            os.system(
-                f"kaggle datasets download -d shrutimechlearn/churn-modelling -p {self.data_path} --unzip"
+        if not os.path.exists(f"{self.data_path}/Churn_Modelling.csv"):
+            kaggle.api.dataset_download_files(
+                "shrutimechlearn/churn-modelling", path=self.data_path, unzip=True
             )
 
         df = pd.read_csv(file_path)
@@ -67,6 +73,7 @@ class ChurnDataProcessor:
             "IsActiveMember",
             "EstimatedSalary",
             "Balance",
+            "Exited",
         ]
         for col in numerical_cols:
             self.df_clean[col] = self.df_clean[col].astype("float64")
@@ -82,8 +89,10 @@ class ChurnDataProcessor:
         balance_threshold = self.df_clean["Balance"].quantile(0.75)
         self.df_clean["high_value_customer"] = (
             self.df_clean["Balance"] > balance_threshold
-        ).astype(float)
-        self.df_clean["zero_balance"] = (self.df_clean["Balance"] == 0).astype(float)
+        ).astype("float64")
+        self.df_clean["zero_balance"] = (self.df_clean["Balance"] == 0).astype(
+            "float64"
+        )
 
         # calculate numerical features after engineering
         self.numerical_features = [
@@ -170,11 +179,11 @@ class ChurnModelTrainer:
         self.pipeline.fit(self.X_train, self.y_train)
 
         # evaluate
-        y_pred = self.pipeline.predict(self.X_val)
-        accuracy = accuracy_score(self.y_val, y_pred)
-        f1 = f1_score(self.y_val, y_pred)
+        self.y_val_pred = self.pipeline.predict(self.X_val)
+        self.accuracy = accuracy_score(self.y_val, self.y_val_pred)
+        self.f1 = f1_score(self.y_val, self.y_val_pred)
 
-        print(f"Model trained: Accuracy={accuracy:.3f}, F1={f1:.3f}")
+        print(f"Model trained: Accuracy={self.accuracy:.3f}, F1={self.f1:.3f}")
         print(
             f"Data split: {len(self.X_train)} train, {len(self.X_val)} val, {len(self.X_test)} test"
         )
@@ -184,13 +193,7 @@ class ChurnModelTrainer:
     def log_to_mlflow(self):
         """Log pipeline to MLflow"""
 
-        with mlflow.start_run():
-            # calculate metrics
-            y_pred = self.pipeline.predict(self.X_val)
-            accuracy = accuracy_score(self.y_val, y_pred)
-            f1 = f1_score(self.y_val, y_pred)
-
-            # log parameters and metrics
+        with mlflow.start_run() as run:
             mlflow.log_params(
                 {
                     "model_type": "Pipeline_LogisticRegression",
@@ -198,83 +201,58 @@ class ChurnModelTrainer:
                     "n_features": self.X_train.shape[1],
                 }
             )
+            mlflow.log_metrics({"accuracy": self.accuracy, "f1_score": self.f1})
 
-            mlflow.log_metrics({"accuracy": accuracy, "f1_score": f1})
+            signature = infer_signature(self.X_train, self.y_train)
 
-            # log pipeline with signature
-            from mlflow.models.signature import infer_signature
-
-            signature = infer_signature(
-                self.X_train, self.pipeline.predict(self.X_train)
-            )
-
-            logged_model = mlflow.sklearn.log_model(
+            mlflow.sklearn.log_model(
                 self.pipeline,
                 name="model",
                 signature=signature,
                 input_example=self.X_train.head(1),
             )
 
+            model_uri = f"runs:/{run.info.run_id}/model"
             print("Model logged to MLflow")
-            return logged_model
+            return model_uri, run.info.run_id
 
 
 class ChurnModelRegistry:
     def __init__(self, model_name="bank-churn-classifier"):
         self.model_name = model_name
 
-    def register_model(self, trainer):
+    def register_model(self, model_uri, run_id):
         """Register trained pipeline in MLflow registry"""
 
-        with mlflow.start_run():
-            # test dataset evaluation
-            y_test_pred = trainer.pipeline.predict(trainer.X_test)
-            test_accuracy = accuracy_score(trainer.y_test, y_test_pred)
-            test_f1 = f1_score(trainer.y_test, y_test_pred)
+        client = MlflowClient()
 
-            # log final test metrics
-            mlflow.log_params(
-                {
-                    "model_type": "Pipeline_LogisticRegression",
-                    "test_size": len(trainer.X_test),
-                    "final_model": True,
-                }
-            )
+        model_version = client.create_model_version(
+            name=self.model_name, source=model_uri, run_id=run_id
+        )
 
-            mlflow.log_metrics({"test_accuracy": test_accuracy, "test_f1": test_f1})
+        client.set_registered_model_alias(
+            name=self.model_name,
+            alias="production",
+            version=model_version.version,
+        )
 
-            # log the pipeline
-            from mlflow.models.signature import infer_signature
+        print(f"Pipeline registered: {self.model_name} version {model_version.version}")
 
-            signature = infer_signature(
-                trainer.X_train, trainer.pipeline.predict(trainer.X_train)
-            )
+        return f"models:/{self.model_name}/{model_version.version}"
 
-            logged_model = mlflow.sklearn.log_model(
-                trainer.pipeline, name="model", signature=signature
-            )
 
-            # register model
-            registered_model = mlflow.register_model(
-                logged_model.model_uri, self.model_name
-            )
+class ChurnModelEvaluator:
+    @staticmethod
+    def final_test(pipeline, X_test, y_test):
+        """Run test on final test dataset"""
 
-            # set production alias
-            from mlflow.tracking import MlflowClient
+        y_pred = pipeline.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
 
-            client = MlflowClient()
-            client.set_registered_model_alias(
-                name=self.model_name,
-                alias="production",
-                version=registered_model.version,
-            )
+        print(f"Final test performance: Accuracy={accuracy:.3f}, F1={f1:.3f}")
 
-            print(
-                f"Pipeline registered: {self.model_name} version {registered_model.version}"
-            )
-            print(f"Test performance: Accuracy={test_accuracy:.3f}, F1={test_f1:.3f}")
-
-            return registered_model
+        return accuracy, f1
 
 
 @task
@@ -296,19 +274,27 @@ def model_training(features, target, processor):
 
     trainer = ChurnModelTrainer()
     trainer.prepare_and_train(features, target, processor)
-    trainer.log_to_mlflow()
+    model_uri, run_id = trainer.log_to_mlflow()
 
-    return trainer
+    return trainer, model_uri, run_id, trainer.X_test, trainer.y_test
 
 
 @task
-def register_model(trainer):
+def register_model(model_uri, run_id):
     """Model registry task"""
 
     registry = ChurnModelRegistry()
-    registered_model = registry.register_model(trainer)
 
-    return registered_model
+    return registry.register_model(model_uri, run_id)
+
+
+@task
+def final_test(pipeline, X_test, y_test):
+    """Final test task"""
+
+    evaluator = ChurnModelEvaluator()
+
+    return evaluator.final_test(pipeline, X_test, y_test)
 
 
 @flow
@@ -317,14 +303,18 @@ def pipeline():
 
     print("testing prefect flow")
 
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("bank-churn-prediction")
 
     print("MLflow configured")
 
     features, target, processor = data_processing()
-    trainer = model_training(features, target, processor)
-    registered_model = register_model(trainer)
+    trainer, model_uri, run_id, X_test, y_test = model_training(
+        features, target, processor
+    )
+    registered_model = register_model(model_uri, run_id)
+
+    accuracy, f1 = final_test(trainer.pipeline, X_test, y_test)
 
     print("Pipeline completed")
 

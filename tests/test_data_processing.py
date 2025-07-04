@@ -44,7 +44,7 @@ def test_load_and_clean_data():
     assert processor.df_clean["HasCrCard"].dtype == "float64"
     assert processor.df_clean["IsActiveMember"].dtype == "float64"
     assert processor.df_clean["EstimatedSalary"].dtype == "float64"
-    assert processor.df_clean["Exited"].dtype == "int64"
+    assert processor.df_clean["Exited"].dtype == "float64"
 
 
 def test_engineer_features():
