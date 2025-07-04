@@ -75,18 +75,23 @@ class ChurnDataProcessor:
 
     def engineer_features(self):
         """Add engineered features"""
-        
+
         # define feature lists
         self.categorical_features = ["Geography", "Gender"]
-        
+
         balance_threshold = self.df_clean["Balance"].quantile(0.75)
-        self.df_clean["high_value_customer"] = (self.df_clean["Balance"] > balance_threshold).astype(float)
+        self.df_clean["high_value_customer"] = (
+            self.df_clean["Balance"] > balance_threshold
+        ).astype(float)
         self.df_clean["zero_balance"] = (self.df_clean["Balance"] == 0).astype(float)
-        
+
         # calculate numerical features after engineering
-        self.numerical_features = [col for col in self.df_clean.columns 
-                                if col not in self.categorical_features + ["Exited"]]
-        
+        self.numerical_features = [
+            col
+            for col in self.df_clean.columns
+            if col not in self.categorical_features + ["Exited"]
+        ]
+
         print("Feature engineering completed")
         return self
 

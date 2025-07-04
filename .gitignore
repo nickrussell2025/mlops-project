@@ -56,3 +56,5 @@ logs/*.jsonl
 # OS
 .DS_Store
 Thumbs.db
+
+tests/monitoring.py
