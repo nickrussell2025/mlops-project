@@ -1,123 +1,75 @@
 import json
-import pandas as pd
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
-from database import get_db_connection, log_drift_result
 from datetime import datetime, timedelta
-import logging
+import pandas as pd
+import psycopg2
+from evidently import Dataset, DataDefinition, Report
+from evidently.presets import DataDriftPreset
 
-logger = logging.getLogger(__name__)
+DB_CONN = dict(host="localhost", port="5432", database="monitoring", user="postgres", password="example")
 
 
-def get_recent_predictions(hours=24, limit=50):
-    """Get recent customer data from database"""
+def get_recent_predictions():
+    """Get recent prediction data from database"""
     
-    conn = get_db_connection()
-    if not conn:
-        return None
+    with psycopg2.connect(**DB_CONN) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT input_data FROM predictions WHERE timestamp >= %s ORDER BY timestamp DESC LIMIT 50",
+                       [datetime.now() - timedelta(hours=24)])
+            rows = cur.fetchall()
+            return pd.DataFrame([row[0] for row in rows]) if len(rows) >= 10 else None
+
+
+def log_drift_result(drift_detected, drift_score, drifted_columns, sample_size):
+    """Save drift detection results to database"""
     
-    try:
-        cur = conn.cursor()
-        query = """
-        SELECT input_data 
-        FROM predictions 
-        WHERE timestamp >= %s
-        ORDER BY timestamp DESC
-        LIMIT %s
-        """
-        
-        since_time = datetime.now() - timedelta(hours=hours)
-        cur.execute(query, [since_time, limit])
-        rows = cur.fetchall()
-        cur.close()
-        
-        if len(rows) < 10:
-            logger.warning(f"Only {len(rows)} recent predictions, need at least 10")
-            return None
-            
-        # Convert to DataFrame
-        features_list = [row[0] for row in rows]
-        current_df = pd.DataFrame(features_list)
-        
-        logger.info(f"Got {len(current_df)} recent predictions")
-        return current_df
-        
-    except Exception as e:
-        logger.error(f"Error getting recent predictions: {e}")
-        return None
-    finally:
-        conn.close()
+    with psycopg2.connect(**DB_CONN) as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO drift_reports (drift_detected, drift_score, feature_name, drift_type, report_data) VALUES (%s, %s, %s, %s, %s)",
+                       (drift_detected, drift_score, f"{drifted_columns}_columns_drifted", "data_drift", 
+                        json.dumps({"drifted_columns": drifted_columns, "drift_share": drift_score, "sample_size": sample_size})))
 
 
 def detect_drift():
     """Main drift detection function"""
     
-    # Load reference data
-    try:
-        reference_df = pd.read_parquet('../monitoring/reference_data.parquet')
-        logger.info(f"Reference data: {reference_df.shape}")
-    except Exception as e:
-        logger.error(f"Failed to load reference data: {e}")
-        return False
+    # load reference data
+    reference_df = pd.read_parquet('/workspaces/mlops-project/monitoring/reference_data.parquet')
     
-    # Get recent data
+    # get current predictions
     current_df = get_recent_predictions()
-    if current_df is None or len(current_df) < 10:
-        logger.warning("Not enough recent data for drift detection")
+    if current_df is None:
         return False
     
-    # Ensure data types match
+    # fix categorical data types
     for col in ['Geography', 'Gender']:
-        if col in reference_df.columns and col in current_df.columns:
-            reference_df[col] = reference_df[col].astype('object')
-            current_df[col] = current_df[col].astype('object')
+        reference_df[col] = reference_df[col].astype('object')
+        current_df[col] = current_df[col].astype('object')
     
-    try:
-        # Run drift detection
-        report = Report(metrics=[DataDriftPreset()])
-        report.run(reference_data=reference_df, current_data=current_df)
-        
-        # Extract actual results from the report
-        result_dict = report.as_dict()
-        
-        # Get dataset-level drift detection
-        dataset_drift = result_dict['metrics'][0]['result']['dataset_drift']
-        drift_share = result_dict['metrics'][0]['result']['drift_share']
-        number_of_drifted_columns = result_dict['metrics'][0]['result']['number_of_drifted_columns']
-        
-        # Get individual column drift results
-        drift_by_columns = result_dict['metrics'][0]['result']['drift_by_columns']
-        
-        # Log the actual results
-        log_drift_result(
-            drift_detected=dataset_drift,
-            drift_score=drift_share,
-            affected_features=list(drift_by_columns.keys()) if drift_by_columns else None,
-            drift_type="data_drift",
-            metadata={
-                "total_columns": len(current_df.columns),
-                "drifted_columns": number_of_drifted_columns,
-                "drift_share": drift_share,
-                "sample_size": len(current_df)
-            }
-        )
-        
-        if dataset_drift:
-            logger.warning(f"DRIFT DETECTED! {number_of_drifted_columns} columns drifted, drift share: {drift_share:.2f}")
-        else:
-            logger.info(f"No drift detected. Drift share: {drift_share:.2f}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Evidently drift detection failed: {e}")
-        return False
+    # define evidently schema
+    schema = DataDefinition(
+        numerical_columns=[col for col in reference_df.columns if col not in ['Geography', 'Gender']],
+        categorical_columns=['Geography', 'Gender']
+    )
+    
+    # run drift detection
+    report = Report([DataDriftPreset()])
+    result = report.run(Dataset.from_pandas(current_df, data_definition=schema), 
+                      Dataset.from_pandas(reference_df, data_definition=schema))
+    
+    # extract results
+    drift_data = result.dict()["metrics"][0]["value"]
+    drift_share = round(float(drift_data["share"]), 3)
+    drifted_columns = int(drift_data["count"])
+    dataset_drift = drift_share > 0.5
+    
+    # log results to database
+    log_drift_result(dataset_drift, drift_share, drifted_columns, len(current_df))
+    
+    # print results
+    print(f"DRIFT DETECTED! {drifted_columns} columns drifted, share: {drift_share}" if dataset_drift else f"No drift. Share: {drift_share}")
+    
+    return True
 
 
 if __name__ == "__main__":
-    success = detect_drift()
-    if success:
-        print("Drift detection completed successfully")
-    else:
-        print("Drift detection failed")
-        exit(1)
+    detect_drift()
