@@ -64,3 +64,16 @@ README.md
 /notebooks
 
 *ipynb
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/terraform.tfvars
+terraform/mlops.plan
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+.ssh/

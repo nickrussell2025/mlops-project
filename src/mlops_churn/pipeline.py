@@ -166,7 +166,7 @@ class ChurnModelTrainer:
                 (
                     "classifier",
                     LogisticRegression(
-                        random_state=1, max_iter=20000, class_weight="balanced"
+                        random_state=1, max_iter=20000, class_weight="balanced", solver="liblinear"
                     ),
                 ),
             ]
