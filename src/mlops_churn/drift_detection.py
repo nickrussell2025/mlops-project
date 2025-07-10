@@ -17,7 +17,6 @@ DB_CONN = {
 
 def get_recent_predictions():
     """Get recent prediction data from database"""
-
     with psycopg2.connect(**DB_CONN) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -30,7 +29,6 @@ def get_recent_predictions():
 
 def log_drift_result(drift_detected, drift_score, drifted_columns, sample_size):
     """Save drift detection results to database"""
-
     with psycopg2.connect(**DB_CONN) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -53,53 +51,64 @@ def log_drift_result(drift_detected, drift_score, drifted_columns, sample_size):
 
 def detect_drift():
     """Main drift detection function"""
+    # Load reference data
+    reference_df = pd.read_parquet("monitoring/reference_data.parquet")
 
-    # load reference data
-    reference_df = pd.read_parquet(
-        "/workspaces/mlops-project/monitoring/reference_data.parquet"
-    )
-
-    # get current predictions
+    # Get current predictions
     current_df = get_recent_predictions()
     if current_df is None:
         return False
 
-    # fix categorical data types
-    for col in ["Geography", "Gender"]:
-        reference_df[col] = reference_df[col].astype("object")
-        current_df[col] = current_df[col].astype("object")
+    # Fix categorical data types
+    if "Gender" in reference_df.columns and "Gender" in current_df.columns:
+        reference_df["Gender"] = reference_df["Gender"].astype("object")
+        current_df["Gender"] = current_df["Gender"].astype("object")
 
-    # define evidently schema
+    # Define schema based on actual columns
+    numerical_columns = [
+        "CreditScore",
+        "Age",
+        "Tenure",
+        "Balance",
+        "NumOfProducts",
+        "EstimatedSalary",
+        "BalanceActivityInteraction",
+        "HasCrCard",
+        "IsActiveMember",
+        "ZeroBalance",
+        "UnderUtilized",
+        "AgeRisk",
+        "GermanyRisk",
+        "GermanyMatureCombo",
+    ]
+    categorical_columns = ["Gender"]
+
     schema = DataDefinition(
-        numerical_columns=[
-            col for col in reference_df.columns if col not in ["Geography", "Gender"]
-        ],
-        categorical_columns=["Geography", "Gender"],
+        numerical_columns=numerical_columns,
+        categorical_columns=categorical_columns,
     )
 
-    # run drift detection
+    # Run drift detection
     report = Report([DataDriftPreset()])
     result = report.run(
         Dataset.from_pandas(current_df, data_definition=schema),
         Dataset.from_pandas(reference_df, data_definition=schema),
     )
 
-    # extract results
+    # Extract results
     drift_data = result.dict()["metrics"][0]["value"]
     drift_share = round(float(drift_data["share"]), 3)
     drifted_columns = int(drift_data["count"])
     dataset_drift = drift_share > 0.5
 
-    # log results to database
+    # Log results
     log_drift_result(dataset_drift, drift_share, drifted_columns, len(current_df))
 
-    # print results
     print(
         f"DRIFT DETECTED! {drifted_columns} columns drifted, share: {drift_share}"
         if dataset_drift
         else f"No drift. Share: {drift_share}"
     )
-
     return True
 
 

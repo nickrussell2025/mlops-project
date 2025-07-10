@@ -1,5 +1,5 @@
+import logging
 import os
-import sys
 import time
 from datetime import datetime
 
@@ -8,15 +8,37 @@ time.tzset()
 
 import mlflow
 import pandas as pd
+from database import log_prediction
 from flask import Flask, jsonify, request
 from mlflow.tracking import MlflowClient
+from pydantic import BaseModel, ValidationError
 
-from src.mlops_churn.config import config
-from src.mlops_churn.database import log_prediction
+from config import config
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 print(f"Python timezone: {time.tzname}, Current time: {datetime.now()}")
+
+
+class CustomerData(BaseModel):
+    """Basic validation for customer data"""
+
+    CreditScore: float
+    Gender: str
+    Age: float
+    Tenure: float
+    Balance: float
+    NumOfProducts: float
+    HasCrCard: float
+    IsActiveMember: float
+    EstimatedSalary: float
+    BalanceActivityInteraction: float
+    ZeroBalance: float
+    UnderUtilized: float
+    AgeRisk: float
+    GermanyRisk: float
+    GermanyMatureCombo: float
 
 
 def create_app():
@@ -39,7 +61,7 @@ def create_app():
 
         print(f"✅ Model loaded: {model_uri} - version {app.model_version}")
     except Exception as e:
-        print(f"❌ Failed to load model: {e}")
+        logger.error(f"Failed to load model: {e}")
         app.model = None
         app.model_loaded = False
         app.model_version = "unknown"
@@ -60,25 +82,35 @@ def create_app():
 
     @app.route("/predict", methods=["POST"])
     def predict():
-        """Single prediction endpoint"""
+        """Single prediction endpoint with Pydantic validation"""
 
         if not app.model_loaded:
             return jsonify({"error": "Model not loaded"}), 500
 
         try:
-            data = request.get_json()
-            if not data:
+            request_data = request.get_json()
+            if not request_data:
                 return jsonify({"error": "No JSON data provided"}), 400
 
-            df_input = pd.DataFrame([data])
+            # Validate with Pydantic
+            try:
+                customer_data = CustomerData(**request_data)
+            except ValidationError as e:
+                return jsonify({"error": "Invalid data", "details": str(e)}), 400
+
+            # Convert and predict
+            df_input = pd.DataFrame([customer_data.dict()])
             prediction = app.model.predict(df_input)[0]
             probability = app.model.predict_proba(df_input)[0][1]
 
+            # Log to database
             model_version = getattr(app, "model_version", "unknown")
-            log_success = log_prediction(data, float(probability), model_version)
+            log_success = log_prediction(
+                customer_data.dict(), float(probability), model_version
+            )
 
             if not log_success:
-                print("Warning: failed to log prediction to database")
+                logger.warning("Failed to log prediction to database")
 
             return jsonify(
                 {
@@ -89,6 +121,7 @@ def create_app():
             )
 
         except Exception as e:
+            logger.error(f"Prediction failed: {str(e)}")
             return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     return app
