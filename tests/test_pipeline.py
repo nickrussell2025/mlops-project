@@ -11,7 +11,6 @@ from sklearn.preprocessing import FunctionTransformer
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.mlops_churn.churn_pipeline import (
-    churn_prediction_pipeline,
     load_and_prepare_data,
     prepare_training_data,
     train_all_models,
@@ -30,23 +29,25 @@ def sample_data():
     """Generate realistic test data for churn prediction tests"""
     np.random.seed(42)
     n_samples = 20
-    
-    data = pd.DataFrame({
-        "CreditScore": np.random.randint(500, 850, n_samples),
-        "Geography": np.random.choice(["France", "Germany", "Spain"], n_samples),
-        "Gender": np.random.choice(["Male", "Female"], n_samples),
-        "Age": np.random.randint(18, 70, n_samples),
-        "Tenure": np.random.randint(0, 11, n_samples),
-        "Balance": np.random.choice(
-            [0] + list(range(10000, 200000, 25000)), n_samples
-        ),
-        "NumOfProducts": np.random.randint(1, 5, n_samples),
-        "HasCrCard": np.random.choice([0, 1], n_samples),
-        "IsActiveMember": np.random.choice([0, 1], n_samples),
-        "EstimatedSalary": np.random.randint(30000, 120000, n_samples),
-        "Exited": np.random.choice([0, 1], n_samples, p=[0.8, 0.2])
-    })
-    
+
+    data = pd.DataFrame(
+        {
+            "CreditScore": np.random.randint(500, 850, n_samples),
+            "Geography": np.random.choice(["France", "Germany", "Spain"], n_samples),
+            "Gender": np.random.choice(["Male", "Female"], n_samples),
+            "Age": np.random.randint(18, 70, n_samples),
+            "Tenure": np.random.randint(0, 11, n_samples),
+            "Balance": np.random.choice(
+                [0] + list(range(10000, 200000, 25000)), n_samples
+            ),
+            "NumOfProducts": np.random.randint(1, 5, n_samples),
+            "HasCrCard": np.random.choice([0, 1], n_samples),
+            "IsActiveMember": np.random.choice([0, 1], n_samples),
+            "EstimatedSalary": np.random.randint(30000, 120000, n_samples),
+            "Exited": np.random.choice([0, 1], n_samples, p=[0.8, 0.2]),
+        }
+    )
+
     # Ensure specific edge cases for testing
     data.loc[0, "Balance"] = 0
     data.loc[1, "Geography"] = "Germany"
@@ -55,34 +56,53 @@ def sample_data():
     data.loc[4, "IsActiveMember"] = 0
     data.loc[:4, "Exited"] = 1
     data.loc[5:, "Exited"] = 0
-    
+
     return data
 
 
 def test_load_and_prepare_data(sample_data):
     """Test data loading, feature engineering, and data types"""
     X, y = load_and_prepare_data(sample_data)
-    
+
     # Basic validation
     assert len(X) == len(y) == 20
     assert "Geography" not in X.columns
-    
+
     # Feature engineering validation
     expected_features = {
-        "CreditScore", "Gender", "Age", "Tenure", "Balance", "NumOfProducts",
-        "HasCrCard", "IsActiveMember", "EstimatedSalary", "BalanceActivityInteraction",
-        "ZeroBalance", "UnderUtilized", "AgeRisk", "GermanyRisk", "GermanyMatureCombo"
+        "CreditScore",
+        "Gender",
+        "Age",
+        "Tenure",
+        "Balance",
+        "NumOfProducts",
+        "HasCrCard",
+        "IsActiveMember",
+        "EstimatedSalary",
+        "BalanceActivityInteraction",
+        "ZeroBalance",
+        "UnderUtilized",
+        "AgeRisk",
+        "GermanyRisk",
+        "GermanyMatureCombo",
     }
     assert expected_features.issubset(set(X.columns))
-    
+
     # Data type validation
     assert y.dtype == "float64"
     assert X["Gender"].dtype == "category"
-    numeric_features = ["CreditScore", "Age", "Tenure", "Balance", "NumOfProducts", 
-                       "EstimatedSalary", "BalanceActivityInteraction"]
+    numeric_features = [
+        "CreditScore",
+        "Age",
+        "Tenure",
+        "Balance",
+        "NumOfProducts",
+        "EstimatedSalary",
+        "BalanceActivityInteraction",
+    ]
     for feature in numeric_features:
         assert X[feature].dtype == "float64"
-    
+
     # Feature logic validation
     zero_balance_customers = X[X["Balance"] == 0]
     assert all(zero_balance_customers["ZeroBalance"] == 1)
@@ -93,7 +113,9 @@ def test_load_and_prepare_data(sample_data):
 def test_prepare_training_data(sample_data):
     """Test train/test split and preprocessor creation"""
     X, y = load_and_prepare_data(sample_data)
-    X_train, X_test, y_train, y_test, preprocessor, class_ratio = prepare_training_data(X, y)
+    X_train, X_test, y_train, y_test, preprocessor, class_ratio = prepare_training_data(
+        X, y
+    )
 
     # Data split validation
     assert all(len(dataset) > 0 for dataset in [X_train, X_test, y_train, y_test])
@@ -110,13 +132,17 @@ def test_prepare_training_data(sample_data):
 def model_sample_data():
     """Create minimal sample data for model testing"""
     np.random.seed(123)
-    
-    X_train = pd.DataFrame({"feature1": np.random.rand(10), "feature2": np.random.rand(10)})
+
+    X_train = pd.DataFrame(
+        {"feature1": np.random.rand(10), "feature2": np.random.rand(10)}
+    )
     y_train = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
-    X_test = pd.DataFrame({"feature1": np.random.rand(5), "feature2": np.random.rand(5)})
+    X_test = pd.DataFrame(
+        {"feature1": np.random.rand(5), "feature2": np.random.rand(5)}
+    )
     y_test = np.array([0, 1, 0, 1, 0])
     preprocessor = FunctionTransformer(validate=True)
-    
+
     return X_train, y_train, X_test, y_test, preprocessor
 
 
@@ -126,8 +152,15 @@ def model_sample_data():
 @patch("src.mlops_churn.churn_pipeline.mlflow.sklearn.log_model")
 @patch("src.mlops_churn.churn_pipeline.mlflow.log_params")
 @patch("src.mlops_churn.churn_pipeline.mlflow.log_metrics")
-def test_train_model_generic(mock_log_metrics, mock_log_params, mock_log_model, 
-                           mock_active_run, mock_gs, mock_mlflow, model_sample_data):
+def test_train_model_generic(
+    mock_log_metrics,
+    mock_log_params,
+    mock_log_model,
+    mock_active_run,
+    mock_gs,
+    mock_mlflow,
+    model_sample_data,
+):
     """Test generic model training function"""
     X_train, y_train, X_test, y_test, preprocessor = model_sample_data
 
@@ -144,9 +177,16 @@ def test_train_model_generic(mock_log_metrics, mock_log_params, mock_log_model,
     mock_mlflow.return_value.__enter__.return_value = mock_run
 
     # Execute and validate
-    results = train_model_generic("TestModel", estimator=MagicMock(), params={"param": [1, 2]},
-                                preprocessor=preprocessor, X_train=X_train, y_train=y_train,
-                                X_test=X_test, y_test=y_test)
+    results = train_model_generic(
+        "TestModel",
+        estimator=MagicMock(),
+        params={"param": [1, 2]},
+        preprocessor=preprocessor,
+        X_train=X_train,
+        y_train=y_train,
+        X_test=X_test,
+        y_test=y_test,
+    )
 
     assert "model" in results
     assert results["cv_score"] == 0.85
@@ -161,8 +201,12 @@ def test_train_all_models(mock_train_generic, model_sample_data):
     X_train, y_train, X_test, y_test, preprocessor = model_sample_data
 
     mock_train_generic.return_value = {
-        "model": MagicMock(), "cv_score": 0.8, "test_recall": 0.7,
-        "test_f1": 0.75, "test_precision": 0.7, "run_id": "1234"
+        "model": MagicMock(),
+        "cv_score": 0.8,
+        "test_recall": 0.7,
+        "test_f1": 0.75,
+        "test_precision": 0.7,
+        "run_id": "1234",
     }
 
     results = train_all_models(preprocessor, 1.5, X_train, y_train, X_test, y_test)
@@ -170,6 +214,16 @@ def test_train_all_models(mock_train_generic, model_sample_data):
     assert isinstance(results, dict)
     expected_models = {"LogisticRegression", "RandomForest", "XGBoost", "LightGBM"}
     assert set(results.keys()) == expected_models
-    
+
     for _name, res in results.items():
-        assert all(key in res for key in ["cv_score", "test_recall", "test_f1", "test_precision", "model", "run_id"])
+        assert all(
+            key in res
+            for key in [
+                "cv_score",
+                "test_recall",
+                "test_f1",
+                "test_precision",
+                "model",
+                "run_id",
+            ]
+        )
