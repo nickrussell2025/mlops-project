@@ -4,7 +4,7 @@
 resource "google_compute_network" "mlops_vpc" {
   name                    = "mlops-vpc"
   auto_create_subnetworks = false
-  description            = "VPC for MLOps project"
+  description             = "VPC for MLOps project"
 }
 
 # Subnet

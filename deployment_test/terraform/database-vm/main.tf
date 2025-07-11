@@ -7,7 +7,7 @@ terraform {
       version = "~> 6.0"
     }
   }
-  
+
   backend "gcs" {
     bucket = "mlops-churn-prediction-terraform-state"
     prefix = "terraform/state"
