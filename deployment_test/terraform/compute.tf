@@ -47,16 +47,16 @@ resource "google_compute_instance" "mlops_vm" {
           
           env = [
             {
-                name  = "PORT"
-                value = "8080"
+              name  = "PORT"
+              value = "8080"
             },
             {
-                name  = "TZ"
-                value = "Europe/London"
+              name  = "TZ"
+              value = "Europe/London"
             },
             {
-                name  = "DATABASE_URL"
-                value = "postgresql://postgres:test123@${google_compute_instance.database_vm.network_interface[0].network_ip}:5432/monitoring"
+              name  = "DATABASE_URL"
+              value = "postgresql://postgres:test123@${google_compute_instance.database_vm.network_interface[0].network_ip}:5432/monitoring"
             }
           ]
           
@@ -100,4 +100,7 @@ resource "google_compute_instance" "mlops_vm" {
     project     = "mlops-churn"
     container   = "cos-stable"
   }
+  
+  # Ensure database VM completes startup before container VM starts
+  depends_on = [google_compute_instance.database_vm]
 }
