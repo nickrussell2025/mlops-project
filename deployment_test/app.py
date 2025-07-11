@@ -65,6 +65,21 @@ def create_app():
 
     return app
 
+    @app.route("/db-test")
+    def test_database():
+        """Test database connection."""
+        try:
+            import psycopg2
+            DATABASE_URL = os.getenv('DATABASE_URL', 'not_configured')
+            conn = psycopg2.connect(DATABASE_URL)
+            cursor = conn.cursor()
+            cursor.execute("SELECT version();")
+            result = cursor.fetchone()
+            conn.close()
+            return jsonify({"database": "connected", "version": result[0][:20]})
+        except Exception as e:
+            return jsonify({"database": "failed", "error": str(e)})
+
 # For development testing
 if __name__ == "__main__":
     app = create_app()

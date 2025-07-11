@@ -72,6 +72,8 @@ README.md
 **/terraform.tfstate.backup
 **/*.tfvars
 **/terraform.tfplan
+**/*.plan
+
 
 # SSH keys
 *.pem
