@@ -15,7 +15,8 @@ resource "google_compute_instance" "database_vm" {
     subnetwork = google_compute_subnetwork.mlops_subnet.id
   }
 
-  metadata_startup_script = <<-EOF
+  metadata = {
+    startup-script = <<-EOF
     #!/bin/bash
     set -e
     
@@ -64,6 +65,7 @@ resource "google_compute_instance" "database_vm" {
     
     echo "PostgreSQL setup completed successfully at $(date)"
   EOF
+  }
 }
 
 # Allow database access
