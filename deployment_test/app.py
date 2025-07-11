@@ -63,8 +63,6 @@ def create_app():
             "endpoints": ["/", "/predict", "/info"]
         })
 
-    return app
-
     @app.route("/db-test")
     def test_database():
         """Test database connection."""
@@ -79,6 +77,9 @@ def create_app():
             return jsonify({"database": "connected", "version": result[0][:20]})
         except Exception as e:
             return jsonify({"database": "failed", "error": str(e)})
+        
+    return app
+
 
 # For development testing
 if __name__ == "__main__":
