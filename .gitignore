@@ -66,11 +66,12 @@ README.md
 *ipynb
 
 # Terraform
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.backup
-terraform/terraform.tfvars
-terraform/mlops.plan
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfstate.backup
+**/*.tfvars
+**/terraform.tfplan
 
 # SSH keys
 *.pem
