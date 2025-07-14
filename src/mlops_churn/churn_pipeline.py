@@ -1,9 +1,7 @@
 import os
-import time
 
-os.environ["TZ"] = "Europe/London"
-time.tzset()
-
+# os.environ["TZ"] = "Europe/London"
+# time.tzset()
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -25,7 +23,10 @@ from xgboost import XGBClassifier
 def setup_mlflow():
     """Initialize MLflow with minimal logging to reduce clutter."""
     mlflow_port = os.getenv("MLFLOW_PORT", "5000")
-    mlflow.set_tracking_uri(f"http://localhost:{mlflow_port}")
+    tracking_uri = os.getenv(
+        "MLFLOW_TRACKING_URI", f"http://localhost:{os.getenv('MLFLOW_PORT', '5000')}"
+    )
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("bank-churn-prediction")
 
     mlflow.sklearn.autolog(
