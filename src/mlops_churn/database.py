@@ -5,6 +5,8 @@ import sys
 
 import psycopg2
 
+from config import config
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
 # set up logging
@@ -16,11 +18,12 @@ def get_db_connection():
 
     try:
         conn = psycopg2.connect(
-            host=os.getenv("DATABASE_HOST", "localhost"),
+            host=os.getenv("DATABASE_HOST", config.DATABASE_HOST),
             port=os.getenv("DATABASE_PORT", "5432"),
             database=os.getenv("DATABASE_NAME", "monitoring"),
             user=os.getenv("DATABASE_USER", "postgres"),
-            password=os.getenv("DATABASE_PASSWORD", "example"),
+            password=os.getenv("DATABASE_PASSWORD", config.DATABASE_PASSWORD),
+            connection_timeout=10
         )
         logger.info("Database connection successful")
         return conn

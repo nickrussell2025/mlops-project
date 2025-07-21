@@ -1,101 +1,36 @@
-# infrastructure/main.tf - Stable foundation (database, storage, IAM)
+# infrastructure/outputs.tf - Output declarations for infrastructure layer
 
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 6.0"
-    }
-  }
-  backend "gcs" {
-    bucket = "mlops-churn-prediction-465023-terraform-state"
-    prefix = "infrastructure/state"
-  }
+output "project_id" {
+  description = "GCP project ID"
+  value       = "mlops-churn-prediction-465023"
 }
 
-provider "google" {
-  project = "mlops-churn-prediction-465023"
-  region  = "europe-west2"
+output "region" {
+  description = "GCP region"
+  value       = "europe-west2"
 }
 
-variable "db_password" {
-  description = "Database password"
-  type        = string
-  sensitive   = true
+output "cloud_sql_ip" {
+  description = "Cloud SQL instance IP address"
+  value       = google_sql_database_instance.mlflow_db.ip_address[0].ip_address
 }
 
-# Cloud SQL PostgreSQL Instance
-resource "google_sql_database_instance" "mlflow_db" {
-  name             = "mlflow-db"
-  database_version = "POSTGRES_14"
-  region           = "europe-west2"
-  
-  settings {
-    tier = "db-f1-micro"
-    ip_configuration {
-      ipv4_enabled = true
-      authorized_networks {
-        name  = "allow-all"
-        value = "0.0.0.0/0"
-      }
-    }
-    backup_configuration {
-      enabled    = true
-      start_time = "03:00"
-    }
-    disk_autoresize = true
-    disk_size      = 20
-    disk_type      = "PD_SSD"
-  }
-  deletion_protection = false
+output "database_name" {
+  description = "Database name"
+  value       = google_sql_database.mlflow.name
 }
 
-resource "google_sql_database" "mlflow" {
-  name     = "mlflow"
-  instance = google_sql_database_instance.mlflow_db.name
+output "database_user" {
+  description = "Database user"
+  value       = google_sql_user.mlflow_user.name
 }
 
-resource "google_sql_user" "mlflow_user" {
-  name     = "postgres"
-  instance = google_sql_database_instance.mlflow_db.name
-  password = var.db_password
+output "service_account_email" {
+  description = "Service account email for Cloud Run"
+  value       = google_service_account.cloud_run_sa.email
 }
 
-# GCS Bucket for MLflow Artifacts
-resource "google_storage_bucket" "mlflow_artifacts" {
-  name     = "mlops-churn-prediction-465023-mlflow-artifacts"
-  location = "europe-west2"
-  
-  versioning {
-    enabled = true
-  }
-  lifecycle_rule {
-    condition {
-      age = 90
-    }
-    action {
-      type = "Delete"
-    }
-  }
-  uniform_bucket_level_access = true
-  force_destroy = false
-}
-
-# Service Account for Cloud Run Services
-resource "google_service_account" "cloud_run_sa" {
-  account_id   = "mlops-cloud-run-sa"
-  display_name = "MLOps Cloud Run Service Account"
-}
-
-resource "google_storage_bucket_iam_member" "artifacts_access" {
-  bucket = google_storage_bucket.mlflow_artifacts.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-}
-
-resource "google_project_iam_member" "cloud_run_invoker" {
-  project = "mlops-churn-prediction-465023"
-  role    = "roles/run.invoker"
-  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+output "artifacts_bucket_url" {
+  description = "GCS artifacts bucket URL"
+  value       = "gs://${google_storage_bucket.mlflow_artifacts.name}"
 }

@@ -30,7 +30,7 @@ resource "google_sql_database_instance" "mlflow_db" {
   name             = "mlflow-db"
   database_version = "POSTGRES_14"
   region           = "europe-west2"
-  
+
   settings {
     tier = "db-f1-micro"
     ip_configuration {
@@ -45,10 +45,10 @@ resource "google_sql_database_instance" "mlflow_db" {
       start_time = "03:00"
     }
     disk_autoresize = true
-    disk_size      = 20
-    disk_type      = "PD_SSD"
+    disk_size       = 20
+    disk_type       = "PD_SSD"
   }
-  deletion_protection = false
+  deletion_protection = true
 }
 
 resource "google_sql_database" "mlflow" {
@@ -66,7 +66,7 @@ resource "google_sql_user" "mlflow_user" {
 resource "google_storage_bucket" "mlflow_artifacts" {
   name     = "mlops-churn-prediction-465023-mlflow-artifacts"
   location = "europe-west2"
-  
+
   versioning {
     enabled = true
   }
@@ -79,7 +79,7 @@ resource "google_storage_bucket" "mlflow_artifacts" {
     }
   }
   uniform_bucket_level_access = true
-  force_destroy = false
+  force_destroy               = false
 }
 
 # Service Account for Cloud Run Services

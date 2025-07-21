@@ -1,5 +1,3 @@
-"""Configuration for the MLOps project."""
-
 import os
 from pathlib import Path
 
@@ -11,11 +9,18 @@ class Config:
 
     MODEL_NAME = "bank-churn-classifier"
 
-    # flask api config
-    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+    # Flask API config - cloud-aware
+    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
     MODEL_ALIAS = os.getenv("MODEL_ALIAS", "production")
     API_HOST = os.getenv("API_HOST", "0.0.0.0")
     API_PORT = int(os.getenv("API_PORT", "8080"))
+
+    # Database config - cloud-aware
+    DATABASE_HOST = os.getenv("DATABASE_HOST", "localhost")
+    DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
+    DATABASE_NAME = os.getenv("DATABASE_NAME", "monitoring")
+    DATABASE_USER = os.getenv("DATABASE_USER", "postgres")
+    DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "example")
 
 
 config = Config()
