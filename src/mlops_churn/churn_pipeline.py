@@ -21,10 +21,11 @@ from xgboost import XGBClassifier
 
 @task
 def setup_mlflow():
-    """Initialize MLflow with minimal logging to reduce clutter."""
-    mlflow_port = os.getenv("MLFLOW_PORT", "5000")
+    """Initialize MLflow with Cloud Run server."""
+    # Use Cloud Run MLflow server instead of localhost
     tracking_uri = os.getenv(
-        "MLFLOW_TRACKING_URI", f"http://localhost:{os.getenv('MLFLOW_PORT', '5000')}"
+        "MLFLOW_TRACKING_URI", 
+        "https://mlflow-working-beekr2ij2q-nw.a.run.app"
     )
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("bank-churn-prediction")
@@ -38,9 +39,8 @@ def setup_mlflow():
         log_post_training_metrics=False,
     )
 
-    print(f"✅ MLflow configured: http://localhost:{mlflow_port}")
+    print(f"✅ MLflow configured: {tracking_uri}")
     return mlflow.get_experiment_by_name("bank-churn-prediction").experiment_id
-
 
 @task
 def load_and_prepare_data(df):

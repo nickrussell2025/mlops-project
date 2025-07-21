@@ -18,22 +18,20 @@ resource "google_cloud_run_service" "mlflow" {
         spec {
             service_account_name = local.infra.service_account_email
             containers {
-                # Use Bitnami MLflow image from Docker Hub (Cloud Run compatible)
-                image = "bitnami/mlflow:latest"
-                
-                # Use shell command to properly handle Cloud Run PORT variable
-                command = ["/bin/sh"]
-                args = [
-                    "-c",
-                    "mlflow server --host 0.0.0.0 --port $PORT --backend-store-uri \"$MLFLOW_BACKEND_STORE_URI\" --default-artifact-root \"$MLFLOW_ARTIFACT_ROOT\""
-                ]
-                
+                # Use Python base image with MLflow installed at runtime
+                # image = "gcr.io/mlops-churn-prediction-465023/mlflow:latest"
+                # image = "gcr.io/mlops-churn-prediction-465023/mlflow:gunicorn"
+                image = "gcr.io/mlops-churn-prediction-465023/mlflow:fixed"
+
+
+            
                 env {
                     name  = "MLFLOW_BACKEND_STORE_URI"
                     value = "postgresql://${local.infra.database_user}:${var.db_password}@${local.infra.cloud_sql_ip}:5432/${local.infra.database_name}"
                 }
                 env {
-                    name  = "MLFLOW_ARTIFACT_ROOT"
+                    # name  = "MLFLOW_ARTIFACT_ROOT"
+                    name  = "MLFLOW_DEFAULT_ARTIFACT_ROOT"
                     value = local.infra.artifacts_bucket_url
                 }
                 
@@ -45,10 +43,10 @@ resource "google_cloud_run_service" "mlflow" {
                 }
                 
                 ports {
-                    container_port = 5000
+                    container_port = 8080
                 }
             }
-            timeout_seconds = 300
+            timeout_seconds = 900
         }
     }
     traffic {
