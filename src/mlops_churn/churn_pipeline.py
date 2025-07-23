@@ -17,6 +17,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
+from prefect_gcp import GcpCredentials
 
 
 @task
@@ -41,6 +42,14 @@ def setup_mlflow():
 
     print(f"✅ MLflow configured: {tracking_uri}")
     return mlflow.get_experiment_by_name("bank-churn-prediction").experiment_id
+
+
+@task
+def setup_gcp_auth():
+    """Load GCP credentials for MLflow artifacts"""
+    gcp_creds = GcpCredentials.load("gcp-creds")
+    return "authenticated"
+
 
 @task
 def load_and_prepare_data(df):
@@ -180,9 +189,9 @@ def train_model_generic(
         )
 
         signature = infer_signature(X_train, y_train)
-        # mlflow.sklearn.log_model(
-        #     model, name="model", signature=signature, input_example=X_train.head(1)
-        # )
+        mlflow.sklearn.log_model(
+            model, name="model", signature=signature, input_example=X_train.head(1)
+        )
 
         # Business impact metrics
         cm = confusion_matrix(y_test, y_pred)
@@ -341,6 +350,9 @@ def churn_prediction_pipeline(df=None):
 
     print("\n📋 STEP 1: Initialize MLflow")
     setup_mlflow()
+    
+    print("\n📋 STEP 1.5: Setup GCP Authentication")
+    setup_gcp_auth()   
 
     print("\n📋 STEP 2: Load and prepare data")
     X, y = load_and_prepare_data(df)
