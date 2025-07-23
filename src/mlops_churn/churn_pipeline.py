@@ -5,7 +5,7 @@ import os
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-from lightgbm import LGBMClassifier
+# from lightgbm import LGBMClassifier
 from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
 from prefect import flow, task
@@ -234,15 +234,15 @@ def train_all_models(preprocessor, class_ratio, X_train, y_train, X_test, y_test
                 "clf__scale_pos_weight": [class_ratio * 2, class_ratio * 3],
             },
         },
-        "LightGBM": {
-            "estimator": LGBMClassifier(random_state=42, verbose=-1),
-            "params": {
-                "clf__n_estimators": [200, 300],
-                "clf__max_depth": [8, 10],
-                "clf__min_child_samples": [5, 10],
-                "clf__class_weight": [{0: 1, 1: 5}, {0: 1, 1: 6}],
-            },
-        },
+        # "LightGBM": {
+        #     "estimator": LGBMClassifier(random_state=42, verbose=-1),
+        #     "params": {
+        #         "clf__n_estimators": [200, 300],
+        #         "clf__max_depth": [8, 10],
+        #         "clf__min_child_samples": [5, 10],
+        #         "clf__class_weight": [{0: 1, 1: 5}, {0: 1, 1: 6}],
+        #     },
+        # },
     }
 
     results = {}
