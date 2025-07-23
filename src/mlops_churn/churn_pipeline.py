@@ -48,21 +48,18 @@ def setup_mlflow():
 @task
 def setup_gcp_auth():
     """Load GCP credentials for MLflow artifacts"""
+    from prefect_gcp import GcpCredentials
+    import os
     
     gcp_creds = GcpCredentials.load("gcp-creds")
     
-    # Convert SecretDict to regular dict
-    creds_dict = dict(gcp_creds.service_account_info)
+    # Use the prefect-gcp method to get actual credentials
+    credentials = gcp_creds.get_credentials_from_service_account()
     
-    # Write credentials to temp file
-    creds_file = "/tmp/gcp-credentials.json"
-    with open(creds_file, "w") as f:
-        json.dump(creds_dict, f)
+    # Set environment variable that google-cloud-storage will use
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credentials)
     
-    # Set environment variable
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file
-    
-    print(f"✅ GCP credentials configured")
+    print("✅ GCP credentials configured")
     return "authenticated"
 
 @task
