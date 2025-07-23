@@ -6,7 +6,7 @@ if __name__ == "__main__":
         entrypoint="src/mlops_churn/churn_pipeline.py:churn_prediction_pipeline",
     ).deploy(
         name="churn-pipeline-gcp",
-        work_pool_name=None,  # This makes it run directly on the Prefect server VM
+        work_pool_name="default-agent-pool",
         job_variables={
             "pip_packages": ["mlflow", "pandas", "scikit-learn", "google-cloud-storage", "lightgbm", "xgboost", "imbalanced-learn", "prefect-gcp"]
         }
