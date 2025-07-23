@@ -22,41 +22,6 @@ import json
 
 
 @task
-def debug_service_account():
-    """Check what service account is being used"""
-    try:
-        import requests
-        import json
-        
-        # Query GCP metadata server to see current service account
-        response = requests.get(
-            'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email',
-            headers={'Metadata-Flavor': 'Google'},
-            timeout=5
-        )
-        
-        if response.status_code == 200:
-            service_account = response.text
-            print(f"🔍 Current service account: {service_account}")
-            
-            # Check if it has GCS permissions
-            token_response = requests.get(
-                'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
-                headers={'Metadata-Flavor': 'Google'},
-                timeout=5
-            )
-            
-            print(f"🔍 Token access: {token_response.status_code == 200}")
-            return service_account
-        else:
-            print("❌ No metadata server access - not running on GCP")
-            return "unknown"
-            
-    except Exception as e:
-        print(f"❌ Cannot determine service account: {e}")
-        return "error"
-
-@task
 def setup_mlflow():
     """Initialize MLflow with Cloud Run server."""
     # Use Cloud Run MLflow server instead of localhost

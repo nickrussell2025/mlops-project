@@ -5,7 +5,9 @@ if __name__ == "__main__":
         source="https://github.com/nickrussell2025/mlops-project.git",
         entrypoint="src/mlops_churn/churn_pipeline.py:churn_prediction_pipeline",
     ).deploy(
-        name="churn-pipeline-v3",
-        work_pool_name="my-managed-pool",
-        job_variables={"pip_packages": ["mlflow", "pandas", "scikit-learn", "google-cloud-storage", "lightgbm", "xgboost", "imbalanced-learn", "prefect-gcp"]}
+        name="churn-pipeline-gcp",
+        work_pool_name=None,  # This makes it run directly on the Prefect server VM
+        job_variables={
+            "pip_packages": ["mlflow", "pandas", "scikit-learn", "google-cloud-storage", "lightgbm", "xgboost", "imbalanced-learn", "prefect-gcp"]
+        }
     )
