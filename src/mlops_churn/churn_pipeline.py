@@ -44,22 +44,6 @@ def setup_mlflow():
     print(f"✅ MLflow configured: {tracking_uri}")
     return mlflow.get_experiment_by_name("bank-churn-prediction").experiment_id
 
-
-@task
-def setup_gcp_auth():
-    """Configure MLflow with proper GCP credentials"""
-    from prefect_gcp import GcpCredentials
-    from google.cloud import storage
-    
-    gcp_creds = GcpCredentials.load("gcp-creds")
-    
-    credentials = gcp_creds.get_credentials_from_service_account()
-    
-    client = storage.Client(credentials=credentials)
-    print("✅ GCS client created successfully")
-    
-    return "authenticated"
-
 @task
 def load_and_prepare_data(df):
     """Load data and create optimized features."""
@@ -359,9 +343,6 @@ def churn_prediction_pipeline(df=None):
 
     print("\n📋 STEP 1: Initialize MLflow")
     setup_mlflow()
-    
-    print("\n📋 STEP 1.5: Setup GCP Authentication")
-    setup_gcp_auth()   
 
     print("\n📋 STEP 2: Load and prepare data")
     X, y = load_and_prepare_data(df)
