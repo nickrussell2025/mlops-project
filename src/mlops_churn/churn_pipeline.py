@@ -51,15 +51,18 @@ def setup_gcp_auth():
     
     gcp_creds = GcpCredentials.load("gcp-creds")
     
-    # Write credentials to temp file for google-cloud-storage to use
+    # Convert SecretDict to regular dict
+    creds_dict = dict(gcp_creds.service_account_info)
+    
+    # Write credentials to temp file
     creds_file = "/tmp/gcp-credentials.json"
     with open(creds_file, "w") as f:
-        json.dump(gcp_creds.service_account_info, f)
+        json.dump(creds_dict, f)
     
-    # Set environment variable so GCS libraries find it
+    # Set environment variable
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file
     
-    print(f"✅ GCP credentials configured at {creds_file}")
+    print(f"✅ GCP credentials configured")
     return "authenticated"
 
 @task
