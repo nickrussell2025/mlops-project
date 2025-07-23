@@ -329,12 +329,9 @@ def save_reference_data_for_monitoring(X, y):
     print(f"✅ Reference data saved: {len(reference_data)} records for monitoring")
     return len(reference_data)
 
-
+@flow(name="churn-prediction-pipeline")
 def churn_prediction_pipeline(df=None):
     """Churn prediction pipeline."""
-    
-    print("\n🔍 DEBUG: Check service account")
-    current_sa = debug_service_account()
     
     # Load data if not provided
     if df is None:
