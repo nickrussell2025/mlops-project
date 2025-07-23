@@ -329,8 +329,14 @@ def save_reference_data_for_monitoring(X, y):
 
 
 @flow
-def churn_prediction_pipeline(df):
+def churn_prediction_pipeline(df=None):
     """Churn prediction pipeline."""
+    
+    # Load data if not provided
+    if df is None:
+        print("Loading data from CSV file...")
+        df = pd.read_csv("data/raw/Churn_Modelling.csv")
+        
     print("=" * 60)
 
     print("\n📋 STEP 1: Initialize MLflow")
