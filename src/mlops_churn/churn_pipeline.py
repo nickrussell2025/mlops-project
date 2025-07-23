@@ -18,6 +18,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 from prefect_gcp import GcpCredentials
+import json
 
 
 @task
@@ -47,9 +48,19 @@ def setup_mlflow():
 @task
 def setup_gcp_auth():
     """Load GCP credentials for MLflow artifacts"""
+    
     gcp_creds = GcpCredentials.load("gcp-creds")
+    
+    # Write credentials to temp file for google-cloud-storage to use
+    creds_file = "/tmp/gcp-credentials.json"
+    with open(creds_file, "w") as f:
+        json.dump(gcp_creds.service_account_info, f)
+    
+    # Set environment variable so GCS libraries find it
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file
+    
+    print(f"✅ GCP credentials configured at {creds_file}")
     return "authenticated"
-
 
 @task
 def load_and_prepare_data(df):
