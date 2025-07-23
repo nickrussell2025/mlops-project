@@ -180,9 +180,9 @@ def train_model_generic(
         )
 
         signature = infer_signature(X_train, y_train)
-        mlflow.sklearn.log_model(
-            model, name="model", signature=signature, input_example=X_train.head(1)
-        )
+        # mlflow.sklearn.log_model(
+        #     model, name="model", signature=signature, input_example=X_train.head(1)
+        # )
 
         # Business impact metrics
         cm = confusion_matrix(y_test, y_pred)
