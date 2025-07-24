@@ -19,8 +19,7 @@ resource "google_cloud_run_service" "model_api" {
         spec {
             service_account_name = local.infra.service_account_email
             containers {
-                # SIMPLE WORKING CONTAINER
-                image = "gcr.io/cloudrun/hello"
+                image = "europe-west2-docker.pkg.dev/mlops-churn-prediction-465023/mlops-repo/model-api:latest"
                 resources {
                     limits = {
                         memory = "1Gi"

@@ -5,7 +5,7 @@ import sys
 
 import psycopg2
 
-from config import config
+from .config import config
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
@@ -23,7 +23,7 @@ def get_db_connection():
             database=os.getenv("DATABASE_NAME", "monitoring"),
             user=os.getenv("DATABASE_USER", "postgres"),
             password=os.getenv("DATABASE_PASSWORD", config.DATABASE_PASSWORD),
-            connection_timeout=10
+            connect_timeout=10
         )
         logger.info("Database connection successful")
         return conn
