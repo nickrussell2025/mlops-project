@@ -5,20 +5,18 @@ import os
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+
 # from lightgbm import LGBMClassifier
 from mlflow.models.signature import infer_signature
 from mlflow.tracking import MlflowClient
 from prefect import flow, task
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from xgboost import XGBClassifier
-from prefect_gcp import GcpCredentials
-import json
+
 from .config import config
 
 
@@ -27,8 +25,7 @@ def setup_mlflow():
     """Initialize MLflow with Cloud Run server."""
     # Use Cloud Run MLflow server instead of localhost
     tracking_uri = os.getenv(
-        "MLFLOW_TRACKING_URI", 
-        "https://mlflow-working-beekr2ij2q-nw.a.run.app"
+        "MLFLOW_TRACKING_URI", "https://mlflow-working-beekr2ij2q-nw.a.run.app"
     )
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("bank-churn-prediction")
@@ -44,6 +41,7 @@ def setup_mlflow():
 
     print(f"✅ MLflow configured: {tracking_uri}")
     return mlflow.get_experiment_by_name("bank-churn-prediction").experiment_id
+
 
 @task
 def load_and_prepare_data(df):
@@ -251,11 +249,11 @@ def train_all_models(preprocessor, class_ratio, X_train, y_train, X_test, y_test
     }
 
     results = {}
-    for name, config in models_config.items():
+    for name, model_config in models_config.items():
         results[name] = train_model_generic(
             name,
-            config["estimator"],
-            config["params"],
+            model_config["estimator"],
+            model_config["params"],
             preprocessor,
             X_train,
             y_train,
@@ -327,28 +325,32 @@ def save_reference_data_for_monitoring(X, y):
     os.makedirs("monitoring", exist_ok=True)
     reference_data = X.copy()
     reference_data["Exited"] = y
-    reference_data.to_parquet("monitoring/reference_data.parquet", index=False)  # ✅ STILL saves locally
-    
+    reference_data.to_parquet(
+        "monitoring/reference_data.parquet", index=False
+    )  # ✅ STILL saves locally
+
     # save to cloud if enabled
     if config.USE_CLOUD_STORAGE:
         from google.cloud import storage
+
         client = storage.Client()
         bucket = client.bucket(config.BUCKET_NAME)
         blob = bucket.blob(config.CLOUD_REFERENCE_PATH)
         blob.upload_from_filename("monitoring/reference_data.parquet")
         print("✅ Reference data also uploaded to cloud")
-    
+
     return len(reference_data)
+
 
 @flow(name="churn-prediction-pipeline")
 def churn_prediction_pipeline(df=None):
     """Churn prediction pipeline."""
-    
+
     # Load data if not provided
     if df is None:
         print("Loading data from CSV file...")
         df = pd.read_csv("data/raw/Churn_Modelling.csv")
-        
+
     print("=" * 60)
 
     print("\n📋 STEP 1: Initialize MLflow")

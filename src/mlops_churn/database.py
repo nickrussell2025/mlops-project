@@ -23,7 +23,7 @@ def get_db_connection():
             database=os.getenv("DATABASE_NAME", "monitoring"),
             user=os.getenv("DATABASE_USER", "postgres"),
             password=os.getenv("DATABASE_PASSWORD", config.DATABASE_PASSWORD),
-            connect_timeout=10
+            connect_timeout=10,
         )
         logger.info("Database connection successful")
         return conn

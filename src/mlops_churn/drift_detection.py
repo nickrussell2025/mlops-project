@@ -53,10 +53,12 @@ def log_drift_result(drift_detected, drift_score, drifted_columns, sample_size):
 
 def load_reference_data():
     if config.USE_CLOUD_STORAGE:
-        return pd.read_parquet(f"gs://{config.BUCKET_NAME}/{config.CLOUD_REFERENCE_PATH}")
+        return pd.read_parquet(
+            f"gs://{config.BUCKET_NAME}/{config.CLOUD_REFERENCE_PATH}"
+        )
     else:
         return pd.read_parquet(config.LOCAL_REFERENCE_PATH)
-    
+
 
 def detect_drift():
     """Main drift detection function"""

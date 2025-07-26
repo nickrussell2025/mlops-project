@@ -8,12 +8,12 @@ time.tzset()
 
 import mlflow
 import pandas as pd
-from .database import log_prediction
 from flask import Flask, jsonify, request
 from mlflow.tracking import MlflowClient
 from pydantic import BaseModel, ValidationError
 
 from .config import config
+from .database import log_prediction
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

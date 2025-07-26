@@ -21,14 +21,18 @@ class Config:
     DATABASE_NAME = os.getenv("DATABASE_NAME", "monitoring")
     DATABASE_USER = os.getenv("DATABASE_USER", "postgres")
     DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "example")
-    
+
     # Storage config
     USE_CLOUD_STORAGE = os.getenv("USE_CLOUD_STORAGE", "false").lower() == "true"
     BUCKET_NAME = os.getenv("BUCKET_NAME", "local-mlflow-artifacts")
-    
+
     # Reference data paths
-    LOCAL_REFERENCE_PATH = os.getenv("LOCAL_REFERENCE_PATH", "monitoring/reference_data.parquet")
-    CLOUD_REFERENCE_PATH = os.getenv("CLOUD_REFERENCE_PATH", "reference/reference_data.parquet")
+    LOCAL_REFERENCE_PATH = os.getenv(
+        "LOCAL_REFERENCE_PATH", "monitoring/reference_data.parquet"
+    )
+    CLOUD_REFERENCE_PATH = os.getenv(
+        "CLOUD_REFERENCE_PATH", "reference/reference_data.parquet"
+    )
 
 
 config = Config()
