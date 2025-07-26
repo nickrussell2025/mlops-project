@@ -56,6 +56,11 @@ resource "google_sql_database" "mlflow" {
   instance = google_sql_database_instance.mlflow_db.name
 }
 
+resource "google_sql_database" "monitoring" {
+  name     = "monitoring"  
+  instance = google_sql_database_instance.mlflow_db.name
+}
+
 resource "google_sql_user" "mlflow_user" {
   name     = "postgres"
   instance = google_sql_database_instance.mlflow_db.name

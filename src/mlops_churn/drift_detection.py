@@ -6,12 +6,14 @@ import psycopg2
 from evidently import DataDefinition, Dataset, Report
 from evidently.presets import DataDriftPreset
 
+from .config import config
+
 DB_CONN = {
-    "host": "localhost",
-    "port": "5432",
-    "database": "monitoring",
-    "user": "postgres",
-    "password": "example",
+    "host": config.DATABASE_HOST,
+    "port": config.DATABASE_PORT,
+    "database": config.DATABASE_NAME,
+    "user": config.DATABASE_USER,
+    "password": config.DATABASE_PASSWORD,
 }
 
 
@@ -49,10 +51,17 @@ def log_drift_result(drift_detected, drift_score, drifted_columns, sample_size):
             )
 
 
+def load_reference_data():
+    if config.USE_CLOUD_STORAGE:
+        return pd.read_parquet(f"gs://{config.BUCKET_NAME}/{config.CLOUD_REFERENCE_PATH}")
+    else:
+        return pd.read_parquet(config.LOCAL_REFERENCE_PATH)
+    
+
 def detect_drift():
     """Main drift detection function"""
     # Load reference data
-    reference_df = pd.read_parquet("monitoring/reference_data.parquet")
+    reference_df = load_reference_data()
 
     # Get current predictions
     current_df = get_recent_predictions()

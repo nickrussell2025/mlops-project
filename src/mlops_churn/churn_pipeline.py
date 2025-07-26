@@ -19,6 +19,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 from prefect_gcp import GcpCredentials
 import json
+from .config import config
 
 
 @task
@@ -214,28 +215,30 @@ def train_all_models(preprocessor, class_ratio, X_train, y_train, X_test, y_test
         "LogisticRegression": {
             "estimator": LogisticRegression(random_state=42, max_iter=1000),
             "params": {
-                "clf__C": [0.1, 1, 10],
-                "clf__class_weight": [{0: 1, 1: 5}, {0: 1, 1: 6}],
+                # "clf__C": [0.1, 1, 10],
+                "clf__C": [1],
+                # "clf__class_weight": [{0: 1, 1: 5}, {0: 1, 1: 6}],
+                "clf__class_weight": [{0: 1, 1: 5}],
             },
         },
-        "RandomForest": {
-            "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
-            "params": {
-                "clf__n_estimators": [200, 300],
-                "clf__max_depth": [None],
-                "clf__min_samples_leaf": [1, 2],
-                "clf__class_weight": [{0: 1, 1: 4}, {0: 1, 1: 5}],
-            },
-        },
-        "XGBoost": {
-            "estimator": XGBClassifier(eval_metric="logloss", random_state=42),
-            "params": {
-                "clf__n_estimators": [200, 300],
-                "clf__max_depth": [8, 10],
-                "clf__min_child_weight": [1],
-                "clf__scale_pos_weight": [class_ratio * 2, class_ratio * 3],
-            },
-        },
+        # "RandomForest": {
+        #     "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
+        #     "params": {
+        #         "clf__n_estimators": [200, 300],
+        #         "clf__max_depth": [None],
+        #         "clf__min_samples_leaf": [1, 2],
+        #         "clf__class_weight": [{0: 1, 1: 4}, {0: 1, 1: 5}],
+        #     },
+        # },
+        # "XGBoost": {
+        #     "estimator": XGBClassifier(eval_metric="logloss", random_state=42),
+        #     "params": {
+        #         "clf__n_estimators": [200, 300],
+        #         "clf__max_depth": [8, 10],
+        #         "clf__min_child_weight": [1],
+        #         "clf__scale_pos_weight": [class_ratio * 2, class_ratio * 3],
+        #     },
+        # },
         # "LightGBM": {
         #     "estimator": LGBMClassifier(random_state=42, verbose=-1),
         #     "params": {
@@ -321,12 +324,20 @@ def analyze_and_register_best_model(results, X, y, model_name="bank-churn-classi
 
 @task
 def save_reference_data_for_monitoring(X, y):
-    """Save reference data for drift monitoring."""
     os.makedirs("monitoring", exist_ok=True)
     reference_data = X.copy()
     reference_data["Exited"] = y
-    reference_data.to_parquet("monitoring/reference_data.parquet", index=False)
-    print(f"✅ Reference data saved: {len(reference_data)} records for monitoring")
+    reference_data.to_parquet("monitoring/reference_data.parquet", index=False)  # ✅ STILL saves locally
+    
+    # save to cloud if enabled
+    if config.USE_CLOUD_STORAGE:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(config.BUCKET_NAME)
+        blob = bucket.blob(config.CLOUD_REFERENCE_PATH)
+        blob.upload_from_filename("monitoring/reference_data.parquet")
+        print("✅ Reference data also uploaded to cloud")
+    
     return len(reference_data)
 
 @flow(name="churn-prediction-pipeline")

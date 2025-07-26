@@ -52,7 +52,7 @@ models/*.joblib
 data/raw/*.csv
 data/processed/*.parquet
 data/reference/*.parquet
-monitoring/
+/data/monitoring/
 
 # Logs
 logs/*.log
@@ -82,15 +82,28 @@ README.md
 # Terraform
 **/.terraform/
 **/terraform.tfstate
-**/terraform.tfstate.*
+**/terraform.tfstate.*  
 **/terraform.tfstate.backup
 **/*.tfvars
+**/*.tfvars.json
 **/terraform.tfplan
 **/*.plan
+**/.terraform.lock.hcl
 
+# Override files
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
 
 # SSH keys
 *.pem
 *.key
 id_rsa*
-.ssh/
+.ssh/.
+
+# Runtime generated data  
+monitoring/
+
+# Environment files
+.env.cloud

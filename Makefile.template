@@ -1,0 +1,111 @@
+# Makefile - MLOps Project Automation
+# Usage: make setup-new-deployment
+
+.PHONY: setup-new-deployment check-requirements setup-environment get-service-urls
+
+# ===== NEW USER SETUP =====
+setup-new-deployment: check-requirements
+	@echo "🚀 Setting up MLOps project for new deployment..."
+	@echo "1. Checking if .env.cloud exists..."
+	@if [ ! -f .env.cloud ]; then \
+		echo "📝 Creating .env.cloud from template..."; \
+		cp .env.template .env.cloud; \
+		echo "❗ REQUIRED: Edit .env.cloud and replace all <YOUR_*> placeholders"; \
+		echo "   - Set your GCP project ID"; \
+		echo "   - Set your preferred region"; \
+		echo "   - Set a secure database password"; \
+		echo ""; \
+		echo "After editing .env.cloud, run: make setup-environment"; \
+		exit 1; \
+	fi
+	@echo "✅ .env.cloud exists, proceeding with setup..."
+	$(MAKE) setup-environment
+
+check-requirements:
+	@echo "🔍 Checking requirements..."
+	@command -v gcloud >/dev/null 2>&1 || { echo "❌ gcloud CLI required but not installed."; exit 1; }
+	@command -v terraform >/dev/null 2>&1 || { echo "❌ terraform required but not installed."; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { echo "❌ docker required but not installed."; exit 1; }
+	@echo "✅ All requirements met"
+
+setup-environment:
+	@echo "🔧 Setting up environment configuration..."
+	@. ./.env.cloud && \
+	if [ -z "$$GOOGLE_CLOUD_PROJECT" ] || echo "$$GOOGLE_CLOUD_PROJECT" | grep -q "<YOUR_"; then \
+		echo "❌ Please edit .env.cloud and replace <YOUR_*> placeholders first"; \
+		exit 1; \
+	fi
+	$(MAKE) get-service-urls
+	$(MAKE) validate-environment
+	@echo "✅ Environment setup complete!"
+
+get-service-urls:
+	@echo "🔗 Getting service URLs from GCP..."
+	@. ./.env.cloud && \
+	PROJECT_NUMBER=$$(gcloud projects describe $$GOOGLE_CLOUD_PROJECT --format="value(projectNumber)") && \
+	CLOUD_SQL_IP=$$(gcloud sql instances describe mlflow-db --format="value(ipAddresses[0].ipAddress)" 2>/dev/null || echo "NOT_DEPLOYED") && \
+	PREFECT_URL=$$(gcloud run services describe prefect-server --region=$$GOOGLE_CLOUD_REGION --format="value(status.url)" 2>/dev/null || echo "NOT_DEPLOYED") && \
+	MLFLOW_URL=$$(gcloud run services describe mlflow-working --region=$$GOOGLE_CLOUD_REGION --format="value(status.url)" 2>/dev/null || echo "NOT_DEPLOYED") && \
+	sed -i.bak \
+		-e "s|<PROJECT_NUMBER>|$$PROJECT_NUMBER|g" \
+		-e "s|<CLOUD_SQL_IP>|$$CLOUD_SQL_IP|g" \
+		-e "s|<PREFECT_URL>|$$PREFECT_URL|g" \
+		-e "s|<MLFLOW_URL>|$$MLFLOW_URL|g" \
+		.env.cloud && \
+	rm .env.cloud.bak
+	@echo "📝 Updated .env.cloud with actual service URLs"
+
+validate-environment:
+	@echo "✅ Validating environment configuration..."
+	@. ./.env.cloud && \
+	echo "Project: $$GOOGLE_CLOUD_PROJECT" && \
+	echo "Region: $$GOOGLE_CLOUD_REGION" && \
+	echo "Prefect URL: $$PREFECT_API_URL" && \
+	echo "MLflow URL: $$MLFLOW_TRACKING_URI"
+
+# ===== DEPLOYMENT COMMANDS =====
+deploy-infrastructure:
+	@echo "🏗️  Deploying infrastructure..."
+	@. ./.env.cloud && \
+	cd terraform/infrastructure && \
+	terraform init && \
+	terraform apply -var="db_password=$$DATABASE_PASSWORD" -auto-approve
+
+deploy-prefect:
+	@echo "🔄 Deploying Prefect server..."
+	@. ./.env.cloud && \
+	cd terraform/prefect-server && \
+	terraform init && \
+	terraform apply -var="db_password=$$DATABASE_PASSWORD" -auto-approve
+
+deploy-all: deploy-infrastructure deploy-prefect
+	@echo "🚀 Full deployment complete!"
+	$(MAKE) get-service-urls
+	@echo "🎉 Your MLOps platform is ready!"
+
+# ===== HELPER COMMANDS =====
+clean-environment:
+	@echo "🧹 Cleaning up environment files..."
+	rm -f .env.cloud .env.local .env
+
+show-status:
+	@echo "📊 Current deployment status:"
+	@. ./.env.cloud 2>/dev/null && \
+	gcloud run services list --region=$$GOOGLE_CLOUD_REGION --format="table(metadata.name,status.url,status.conditions[0].type)"
+
+help:
+	@echo "🔧 MLOps Project Setup Commands:"
+	@echo ""
+	@echo "Setup (for new users):"
+	@echo "  make setup-new-deployment  - Complete setup for new deployment"
+	@echo "  make setup-environment     - Configure environment from existing .env.cloud"
+	@echo ""
+	@echo "Deploy:"
+	@echo "  make deploy-all           - Deploy complete infrastructure"
+	@echo "  make deploy-infrastructure - Deploy base infrastructure only"
+	@echo "  make deploy-prefect       - Deploy Prefect server only"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  make get-service-urls     - Update .env.cloud with actual service URLs"
+	@echo "  make show-status          - Show current deployment status"
+	@echo "  make clean-environment    - Remove environment files"

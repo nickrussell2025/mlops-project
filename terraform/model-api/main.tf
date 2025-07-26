@@ -36,7 +36,7 @@ resource "google_cloud_run_service" "model_api" {
                 }
                 env {
                     name  = "DATABASE_NAME"
-                    value = local.infra.database_name
+                    value = local.infra.monitoring_database_name
                 }
                 env {
                     name  = "DATABASE_USER"
@@ -49,6 +49,14 @@ resource "google_cloud_run_service" "model_api" {
                 env {
                     name  = "DEPLOYMENT_MODE"
                     value = "cloud"
+                }
+                env {
+                    name  = "USE_CLOUD_STORAGE"
+                    value = "true"
+                }
+                env {
+                    name  = "BUCKET_NAME"
+                    value = local.infra.artifacts_bucket_name
                 }
                 ports {
                     container_port = 8080

@@ -1,0 +1,21 @@
+FROM prefecthq/prefect:3-latest
+
+# Install uv
+RUN pip install uv
+
+WORKDIR /opt/prefect
+
+# Copy dependency files
+COPY pyproject.toml ./
+COPY uv.lock ./
+
+# Install dependencies using uv
+RUN uv sync --frozen --no-dev
+
+# Copy source code
+COPY . .
+
+# Set Python path to use the virtual environment
+ENV PATH="/opt/prefect/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/prefect/.venv"
+ENV PYTHONPATH=/opt/prefect
